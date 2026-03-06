@@ -1,7 +1,7 @@
 /* =========================================
-   AETHER-ROME: MASTER STYLESHEET (v4.0 - GOD TIER)
+   AETHER-ROME: MASTER STYLESHEET (v5.0 - GOD TIER)
    Aesthetic: Aether-Academia, Parchment, Sepia & Gold
-   Architecture: GPU-Accelerated, Fluid Responsive, BEM-ish
+   Architecture: Strict Defensive Stacking & GPU-Accelerated
    ========================================= */
 
 /* --- 1. CORE TOKENS (Design System) --- */
@@ -52,7 +52,6 @@ body {
 .crt-scanlines {
     position: fixed;
     inset: 0;
-    /* Tono cálido sepia en lugar de RGB frío */
     background: linear-gradient(rgba(184, 155, 94, 0.03) 50%, rgba(74, 59, 50, 0.05) 50%);
     background-size: 100% 4px;
     pointer-events: none;
@@ -150,7 +149,7 @@ body {
 
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-/* --- 6. STATE MACHINE LAYERS (View Management) --- */
+/* --- 6. STATE MACHINE LAYERS (Strict Z-Index Matrix) --- */
 #display-matrix {
     flex-grow: 1;
     position: relative;
@@ -158,36 +157,38 @@ body {
     justify-content: center;
     align-items: center;
     background: radial-gradient(circle at center, var(--bg-parchment) 0%, var(--wood-pastel) 100%);
+    overflow: hidden; /* Mantiene a los hijos dentro del marco */
 }
 
 .view-layer {
     width: 100%; 
     height: 100%;
-    position: absolute;
-    inset: 0;
+    position: absolute; /* Esencial para el overlay de capas */
+    top: 0; left: 0;
     padding: 20px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    transition: opacity var(--transition-smooth), transform var(--transition-smooth);
-    will-change: opacity, transform; /* GPU Acceleration */
+    transition: opacity var(--transition-smooth), transform var(--transition-smooth), visibility var(--transition-smooth);
+    will-change: opacity, transform, visibility;
 }
 
+/* 🔥 PROTECCIÓN DE MEMORIA VISUAL (El Fix Crítico) */
 .hidden { 
-    opacity: 0; 
-    visibility: hidden; 
-    pointer-events: none; 
-    transform: scale(0.98); 
-    z-index: 0;
+    opacity: 0 !important; 
+    visibility: hidden !important; 
+    pointer-events: none !important; 
+    transform: scale(0.95) !important; 
+    z-index: -10 !important; /* Lo hunde completamente */
 }
 
 .active-layer { 
-    opacity: 1; 
-    visibility: visible; 
-    pointer-events: auto; 
-    transform: scale(1);
-    z-index: 10; 
+    opacity: 1 !important; 
+    visibility: visible !important; 
+    pointer-events: auto !important; 
+    transform: scale(1) !important;
+    z-index: 50 !important; /* Lo eleva con autoridad absoluta */
 }
 
 /* --- 7. THE CLASSROOM (Professor & Chalkboard) --- */
@@ -201,7 +202,7 @@ body {
     background-size: cover;
     background-position: center;
     box-shadow: 0 15px 35px rgba(74, 59, 50, 0.4);
-    transform: translateZ(0); /* Force GPU Render */
+    transform: translateZ(0); 
 }
 
 .hologram-glow { 
@@ -224,11 +225,12 @@ body {
     max-width: 800px;
     padding: clamp(20px, 4vw, 40px);
     border-radius: var(--radius-md);
-    box-shadow: inset 0 2px 15px rgba(74, 59, 50, 0.08), 0 10px 25px rgba(74, 59, 50, 0.1);
+    box-shadow: inset 0 2px 15px rgba(74, 59, 50, 0.08), 0 10px 35px rgba(74, 59, 50, 0.2);
     text-align: center;
+    position: relative; /* Asegura su propio contexto de renderizado */
 }
 
-/* Conecta con el tag <h2> dinámico del engine */
+/* --- 8. TYPOGRAPHY & TRIVIA GRID --- */
 #classroom-layer h2, .sci-fi-text {
     font-family: var(--roman-font);
     color: var(--ink-sepia);
@@ -238,6 +240,13 @@ body {
     padding-bottom: 15px;
 }
 
+/* Énfasis extra para la pregunta de la IA en la trivia */
+.sci-fi-text {
+    color: #3b2f27;
+    font-weight: bold;
+    line-height: 1.4;
+}
+
 .lesson-content {
     font-size: clamp(1.1rem, 2vw, 1.3rem);
     line-height: 1.8;
@@ -245,12 +254,12 @@ body {
     font-weight: 500;
 }
 
-/* --- 8. TRIVIA GRID (Engine Injected) --- */
 .options-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
     gap: 15px;
     margin-top: 25px;
+    width: 100%;
 }
 
 /* --- 9. BUTTONS (The Imperial Standard) --- */
@@ -267,6 +276,10 @@ body {
     text-transform: uppercase;
     transition: transform 0.1s, background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
     box-shadow: 0 4px 6px rgba(74, 59, 50, 0.05); 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px; /* Tamaño táctil robusto */
 }
 
 .btn-option:hover, .sci-fi-btn:hover {
@@ -292,20 +305,10 @@ body {
     color: var(--ink-sepia);
 }
 
-.btn-danger {
-    border-color: var(--alert-rose);
-    color: var(--alert-rose);
-}
-
-.btn-danger:hover {
-    background-color: var(--alert-rose);
-    color: var(--bg-parchment);
-}
-
 /* --- 10. DEFENSE CANVAS --- */
 #defense-grid {
     border: 4px solid var(--border-soft);
-    background-color: #1a1714; /* Oscuro para contraste de los vectores */
+    background-color: #1a1714; 
     border-radius: var(--radius-sm);
     box-shadow: 0 10px 30px rgba(74, 59, 50, 0.3);
     max-width: 100%; 
@@ -329,7 +332,7 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(74, 59, 50, 0.85);
-    backdrop-filter: blur(5px); /* Efecto cristalino vintage */
+    backdrop-filter: blur(5px); 
     display: flex;
     align-items: center;
     justify-content: center;
