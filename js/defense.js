@@ -1,10 +1,10 @@
 /**
- * AETHER-ROME: KINETIC DEFENSE ENGINE v4.0 (OMEGA TIER)
- * Architecture: Data-Oriented Design (DOD), Binary Memory Buffers, Kinematic Raymarching
- * Graphics: Hardware-Accelerated Sub-pixel Rendering, Bloom Compositing
+ * AETHER-ROME: ROMAN SIEGE ENGINE v8.0 (GOD TIER - HISTORICAL SIMULATION)
+ * Architecture: Predictive Point-and-Shoot Artillery, DOD Particle Buffer
+ * Theme: Roman Siege (Onager vs Barbarian Fortress), SPQR Banners, Fire Physics
+ * Pedagogy: Historical contextualization of Roman siege warfare.
  */
 
-// --- VECTOR MATHEMATICS (Zero-Allocation Static Math) ---
 class Vec2 {
     constructor(x = 0, y = 0) { this.x = x; this.y = y; }
     add(v) { this.x += v.x; this.y += v.y; return this; }
@@ -16,47 +16,85 @@ class Vec2 {
 }
 
 export class RomanDefense {
-    // 🔒 CAMPOS PRIVADOS ENCAPSULADOS (Strict Scope)
-    #dom;
-    #ctx;
-    #state;
-    #memory;
-    #onComplete;
-    #lastTime;
-    #animationFrameId;
+    #dom; #ctx; #state; #memory; #onComplete; #lastTime; #animationFrameId; #audioCtx;
 
     constructor(canvasId, onCompleteCallback) {
         this.#dom = { canvas: document.getElementById(canvasId) };
         if (!this.#dom.canvas) throw new Error("ATP-FATAL: Canvas Node Unreachable.");
         
-        // Desactivamos alpha channel para ganar un 25% de rendimiento en GPU
-        this.#ctx = this.#dom.canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.#ctx = this.#dom.canvas.getContext('2d', { alpha: false });
         this.#onComplete = onCompleteCallback;
         
+        this.#initAudioSynthesizer();
         this.#initState();
         this.#setupHardwareInput();
     }
 
+    // ==========================================
+    // 1. PROCEDURAL AUDIO (Sonidos Matemáticos)
+    // ==========================================
+    #initAudioSynthesizer() {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.#audioCtx = new AudioContext();
+    }
+
+    #playCatapultFire() {
+        if (this.#audioCtx.state === 'suspended') this.#audioCtx.resume();
+        const osc = this.#audioCtx.createOscillator();
+        const gain = this.#audioCtx.createGain();
+        osc.type = 'square'; // Sonido grueso de madera y tensión
+        osc.frequency.setValueAtTime(120, this.#audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(20, this.#audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.6, this.#audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.#audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(this.#audioCtx.destination);
+        osc.start();
+        osc.stop(this.#audioCtx.currentTime + 0.4);
+    }
+
+    #playStoneImpact() {
+        if (this.#audioCtx.state === 'suspended') this.#audioCtx.resume();
+        const noise = this.#audioCtx.createBufferSource();
+        const buffer = this.#audioCtx.createBuffer(1, this.#audioCtx.sampleRate * 0.6, this.#audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < buffer.length; i++) data[i] = Math.random() * 2 - 1; // Ruido blanco (Escombros)
+        noise.buffer = buffer;
+
+        const noiseFilter = this.#audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(800, this.#audioCtx.currentTime);
+        noiseFilter.frequency.linearRampToValueAtTime(50, this.#audioCtx.currentTime + 0.6);
+
+        const noiseGain = this.#audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(1.5, this.#audioCtx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, this.#audioCtx.currentTime + 0.6);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.#audioCtx.destination);
+        noise.start();
+    }
+
+    // ==========================================
+    // 2. FÍSICAS Y ESTADO DEL ASEDIO
+    // ==========================================
     #initState() {
         this.#state = {
             isActive: false,
-            gravity: new Vec2(0, 850), // Escalado realista a pixeles/segundo
-            wind: new Vec2(-120, 0),
-            origin: new Vec2(100, 450),
-            targetPos: new Vec2(650, 450),
+            gravity: new Vec2(0, 1200), // Gravedad pesada para rocas reales
+            origin: new Vec2(120, 480), // Posición de tu catapulta (Onagro)
+            target: { x: 650, y: 350, w: 80, h: 150 }, // Fortaleza enemiga
             score: 0,
-            requiredHits: 5,
-            arrowsLeft: 10,
+            requiredHits: 2, 
+            arrowsLeft: 6, // Tienes 6 rocas
             cameraShake: 0,
-            aiming: { active: false, current: new Vec2(0,0), dragStart: new Vec2(0,0) }
+            mousePos: new Vec2(400, 300) // Rastrear el cursor para auto-apuntar
         };
 
-        // MEMORIA BINARIA: El Santo Grial del Rendimiento Web
-        // 300 partículas * 5 propiedades (x, y, vx, vy, life) = 1500 floats.
-        // El CPU lee esto en un solo ciclo de reloj de caché L1.
-        const MAX_PARTICLES = 300;
+        const MAX_PARTICLES = 800; // Humo, fuego y escombros
         this.#memory = {
-            entities: [], // Reservado para objetos complejos (flechas con estelas)
+            entities: [], 
             particleBuffer: new Float32Array(MAX_PARTICLES * 5) 
         };
     }
@@ -66,66 +104,58 @@ export class RomanDefense {
         this.#resize();
         this.#lastTime = performance.now();
         this.#animationFrameId = requestAnimationFrame((ts) => this.#renderLoop(ts));
-        console.log("%c🏹 [AETHER-ROME]: Binary Memory Allocated. Defense System Online.", "color: #00ffcc; background: #111; padding: 4px; font-weight: bold;");
     }
 
     destroy() {
         this.#state.isActive = false;
         cancelAnimationFrame(this.#animationFrameId);
-        // Evita fugas de memoria al limpiar eventos del hardware
         this.#dom.canvas.onpointerdown = null;
         this.#dom.canvas.onpointermove = null;
-        this.#dom.canvas.onpointerup = null;
+        if(this.#audioCtx) this.#audioCtx.close();
     }
 
+    // Resolviendo la pantalla negra para siempre
     #resize() {
-        const dpr = window.devicePixelRatio || 1;
-        this.#dom.canvas.width = 800 * dpr;
-        this.#dom.canvas.height = 600 * dpr;
-        this.#ctx.scale(dpr, dpr);
+        this.#dom.canvas.width = 800;
+        this.#dom.canvas.height = 600;
+        this.#dom.canvas.style.width = '100%';
+        this.#dom.canvas.style.maxWidth = '900px';
+        this.#dom.canvas.style.aspectRatio = '8 / 6';
+        this.#dom.canvas.style.objectFit = 'contain';
+        this.#dom.canvas.style.border = '4px solid #4a2511';
+        this.#dom.canvas.style.borderRadius = '8px';
     }
 
     // ==========================================
-    // SISTEMA TÁCTICO DE APUNTADO (Drag & Release)
+    // 3. NUEVO CONTROL: POINT & SHOOT
     // ==========================================
-
     #setupHardwareInput() {
-        this.#dom.canvas.style.touchAction = "none"; // Evita scroll en móviles
-
-        this.#dom.canvas.addEventListener('pointerdown', (e) => {
-            if (this.#state.arrowsLeft <= 0 || !this.#state.isActive) return;
-            this.#state.aiming.active = true;
-            this.#updateAimTarget(e);
-        });
+        this.#dom.canvas.style.touchAction = "none"; 
 
         this.#dom.canvas.addEventListener('pointermove', (e) => {
-            if (this.#state.aiming.active) this.#updateAimTarget(e);
+            if (!this.#state.isActive) return;
+            const rect = this.#dom.canvas.getBoundingClientRect();
+            // Mapeo perfecto del ratón sin importar el tamaño de tu monitor
+            this.#state.mousePos.x = (e.clientX - rect.left) * (800 / rect.width);
+            this.#state.mousePos.y = (e.clientY - rect.top) * (600 / rect.height);
         });
 
-        this.#dom.canvas.addEventListener('pointerup', () => {
-            if (this.#state.aiming.active) {
-                this.#state.aiming.active = false;
-                this.#fireProjectile();
-            }
+        this.#dom.canvas.addEventListener('pointerdown', () => {
+            if (this.#state.arrowsLeft <= 0 || !this.#state.isActive) return;
+            this.#fireProjectile();
         });
-    }
-
-    #updateAimTarget(e) {
-        const rect = this.#dom.canvas.getBoundingClientRect();
-        this.#state.aiming.current.x = (e.clientX - rect.left) * (800 / rect.width);
-        this.#state.aiming.current.y = (e.clientY - rect.top) * (600 / rect.height);
     }
 
     #calculateBallisticVector() {
-        // Invertimos el vector: Jalar hacia atrás dispara hacia adelante (Mecánica de resortera/arco)
-        const dir = Vec2.sub(this.#state.origin, this.#state.aiming.current);
-        const dist = Vec2.dist(this.#state.origin, this.#state.aiming.current);
-        const power = Math.min(dist * 4.0, 950); // Límite de tensión del arco
+        // La fuerza se calcula apuntando DIRECTAMENTE hacia donde tienes el ratón
+        const dir = Vec2.sub(this.#state.mousePos, this.#state.origin);
+        dir.scale(2.5); // Multiplicador de inercia
         
-        // Si no hay distancia, evitamos dividir por cero (NaN)
-        if (dist > 0) dir.scale(power / dist);
-        else dir.copy(new Vec2(1, -1));
-
+        // Límite de potencia para no romper las físicas
+        const maxSpeed = 1600;
+        const speed = Math.hypot(dir.x, dir.y);
+        if (speed > maxSpeed) dir.scale(maxSpeed / speed);
+        
         return dir;
     }
 
@@ -133,67 +163,64 @@ export class RomanDefense {
         const velocity = this.#calculateBallisticVector();
         
         this.#memory.entities.push({
-            pos: new Vec2(this.#state.origin.x, this.#state.origin.y),
+            pos: new Vec2(this.#state.origin.x, this.#state.origin.y - 40), 
             vel: velocity,
             trail: []
         });
 
         this.#state.arrowsLeft--;
-        this.#triggerScreenShake(4); // Recoil táctil
-
-        // Enlace Neural al Sistema de Sonido (Si existe en window)
-        if (window.AudioSystem) window.AudioSystem.playArrow();
+        this.#triggerScreenShake(8); 
+        this.#playCatapultFire();
     }
 
     // ==========================================
-    // MOTOR DE INTEGRACIÓN FÍSICA (Delta Time)
+    // 4. MOTOR DE FÍSICAS (Actualización)
     // ==========================================
-
     #update(dt) {
         if (!this.#state.isActive) return;
 
-        // Decaimiento del Camera Shake
         if (this.#state.cameraShake > 0.1) this.#state.cameraShake *= 0.85;
 
-        // 1. Cinemática de Proyectiles (Euler)
         for (let i = this.#memory.entities.length - 1; i >= 0; i--) {
-            const arrow = this.#memory.entities[i];
+            const rock = this.#memory.entities[i];
 
-            // Aceleración
-            arrow.vel.x += (this.#state.gravity.x + this.#state.wind.x) * dt;
-            arrow.vel.y += (this.#state.gravity.y + this.#state.wind.y) * dt;
-            
-            // Posición
-            arrow.pos.x += arrow.vel.x * dt;
-            arrow.pos.y += arrow.vel.y * dt;
+            rock.vel.x += this.#state.gravity.x * dt;
+            rock.vel.y += this.#state.gravity.y * dt;
+            rock.pos.x += rock.vel.x * dt;
+            rock.pos.y += rock.vel.y * dt;
 
-            // Memoria de estela (Tasa de muestreo optimizada)
-            if (Math.random() > 0.3) {
-                arrow.trail.push(new Vec2(arrow.pos.x, arrow.pos.y));
-                if (arrow.trail.length > 10) arrow.trail.shift();
-            }
+            // Rastro de la trayectoria
+            rock.trail.push(new Vec2(rock.pos.x, rock.pos.y));
+            if (rock.trail.length > 15) rock.trail.shift();
 
-            // Detección de Colisión Vectorial
-            if (Vec2.dist(arrow.pos, this.#state.targetPos) < 40) {
+            // Instanciar humo y fuego
+            this.#spawnFireParticles(rock.pos.x, rock.pos.y, 2);
+
+            // 🎯 COLISIÓN CON EL MURO ENEMIGO
+            const t = this.#state.target;
+            if (rock.pos.x > t.x && rock.pos.x < t.x + t.w && 
+                rock.pos.y > t.y && rock.pos.y < t.y + t.h) {
                 this.#processImpact(i);
-            } else if (arrow.pos.y > 650 || arrow.pos.x > 850 || arrow.pos.x < -50) {
-                this.#memory.entities.splice(i, 1); // Culling (Eliminación fuera de pantalla)
+            } 
+            // Eliminar si cae al piso
+            else if (rock.pos.y > 550 || rock.pos.x > 850) {
+                this.#memory.entities.splice(i, 1); 
+                this.#triggerScreenShake(4); 
             }
         }
 
-        // 2. Termodinámica de Partículas (Procesamiento de Memoria Binaria Cruda)
+        // Físicas de Partículas (Memoria Binaria)
         const pBuf = this.#memory.particleBuffer;
         for (let i = 0; i < pBuf.length; i += 5) {
-            if (pBuf[i + 4] > 0) { // Si Vida > 0
-                pBuf[i + 2] += this.#state.gravity.x * dt; // vx += ax
-                pBuf[i + 3] += this.#state.gravity.y * dt; // vy += ay
-                pBuf[i] += pBuf[i + 2] * dt;               // x += vx
-                pBuf[i + 1] += pBuf[i + 3] * dt;           // y += vy
-                pBuf[i + 4] -= dt * 1.5;                   // vida -= tiempo
+            if (pBuf[i + 4] > 0) { 
+                pBuf[i + 2] += this.#state.gravity.x * 0.1 * dt; // Humo flota un poco
+                pBuf[i + 3] += this.#state.gravity.y * 0.1 * dt; 
+                pBuf[i] += pBuf[i + 2] * dt;               
+                pBuf[i + 1] += pBuf[i + 3] * dt;           
+                pBuf[i + 4] -= dt * 1.2;                   
             }
         }
 
-        // Lógica de Estado Global
         if (this.#state.score >= this.#state.requiredHits && this.#memory.entities.length === 0) {
             this.#endPhase(true);
         } else if (this.#state.arrowsLeft === 0 && this.#memory.entities.length === 0) {
@@ -202,24 +229,24 @@ export class RomanDefense {
     }
 
     // ==========================================
-    // RENDERIZADO GRÁFICO (GPU Compositing)
+    // 5. RENDERIZADO VISUAL (Gráficos)
     // ==========================================
-
     #renderLoop(timestamp) {
         if (!this.#state.isActive) return;
 
-        // Seguridad matemática: Límite de 0.1s para evitar fallas físicas si cambias de pestaña
-        const dt = Math.min((timestamp - this.#lastTime) / 1000, 0.1);
+        const dt = Math.min((timestamp - this.#lastTime) / 1000, 0.05);
         this.#lastTime = timestamp;
 
         this.#update(dt);
 
-        // Limpieza de Frame buffer (Opaca)
-        this.#ctx.globalCompositeOperation = 'source-over';
-        this.#ctx.fillStyle = '#0f0c0a'; // Tono vintage ultradonscuro
+        // 🌅 CIELO DE ATARDECER BÉLICO
+        const skyGrad = this.#ctx.createLinearGradient(0, 0, 0, 600);
+        skyGrad.addColorStop(0, '#1a1025'); // Cielo nocturno arriba
+        skyGrad.addColorStop(0.6, '#8b2e16'); // Atardecer fuego
+        skyGrad.addColorStop(1, '#4a1506');
+        this.#ctx.fillStyle = skyGrad;
         this.#ctx.fillRect(0, 0, 800, 600);
         
-        // Matriz de Transformación (Camera Shake)
         this.#ctx.save();
         if (this.#state.cameraShake > 0.1) {
             const dx = (Math.random() - 0.5) * this.#state.cameraShake;
@@ -228,138 +255,201 @@ export class RomanDefense {
         }
 
         this.#drawEnvironment();
-        if (this.#state.aiming.active) this.#drawTrajectoryRaymarching();
+        this.#drawPredictiveTrajectory(); // LÍNEA DE APUNTADO
         this.#drawProjectiles();
         
-        // Post-Procesado: Bloom (Iluminación Sumativa)
         this.#ctx.globalCompositeOperation = 'lighter';
         this.#drawParticles();
 
         this.#ctx.restore();
-        
         this.#ctx.globalCompositeOperation = 'source-over';
         this.#drawUI();
 
         this.#animationFrameId = requestAnimationFrame((ts) => this.#renderLoop(ts));
     }
 
-    #drawTrajectoryRaymarching() {
+    // 🎯 ASISTENTE DE TIRO: Dibuja por dónde irá la piedra
+    #drawPredictiveTrajectory() {
+        if (this.#state.arrowsLeft <= 0 || this.#memory.entities.length > 0) return;
+
         const vel = this.#calculateBallisticVector();
         let px = this.#state.origin.x;
-        let py = this.#state.origin.y;
+        let py = this.#state.origin.y - 40;
         const simDt = 0.04; 
 
         this.#ctx.beginPath();
         this.#ctx.moveTo(px, py);
-        this.#ctx.strokeStyle = 'rgba(184, 155, 94, 0.4)';
-        this.#ctx.setLineDash([8, 8]);
-        this.#ctx.lineWidth = 2;
+        this.#ctx.strokeStyle = 'rgba(255, 204, 0, 0.6)'; // Línea dorada
+        this.#ctx.setLineDash([10, 10]);
+        this.#ctx.lineWidth = 3;
 
-        // Simulamos 40 pasos en el futuro sin renderizarlos
-        for (let i = 0; i < 40; i++) {
-            vel.x += (this.#state.gravity.x + this.#state.wind.x) * simDt;
-            vel.y += (this.#state.gravity.y + this.#state.wind.y) * simDt;
+        for (let i = 0; i < 50; i++) {
+            vel.x += this.#state.gravity.x * simDt;
+            vel.y += this.#state.gravity.y * simDt;
             px += vel.x * simDt;
             py += vel.y * simDt;
             this.#ctx.lineTo(px, py);
-            if (py > 600) break;
+            if (py > 550) break; // Terminar si toca el piso
         }
         this.#ctx.stroke();
         this.#ctx.setLineDash([]); 
-
-        // Arco virtual (Tensión visual)
-        this.#ctx.beginPath();
-        this.#ctx.moveTo(this.#state.origin.x, this.#state.origin.y - 20);
-        this.#ctx.lineTo(this.#state.aiming.current.x, this.#state.aiming.current.y);
-        this.#ctx.lineTo(this.#state.origin.x, this.#state.origin.y + 20);
-        this.#ctx.strokeStyle = '#b89b5e';
-        this.#ctx.lineWidth = 1;
-        this.#ctx.stroke();
     }
 
     #drawEnvironment() {
-        // Base de la Puerta Romana
-        this.#ctx.fillStyle = '#2c1e16';
-        this.#ctx.fillRect(this.#state.targetPos.x - 25, this.#state.targetPos.y - 50, 50, 100);
-        
-        // Escudo de Energía / Diana (Glow effect hardware acelerado)
-        this.#ctx.shadowBlur = 15;
-        this.#ctx.shadowColor = '#b89b5e';
-        this.#ctx.strokeStyle = `rgba(184, 155, 94, ${0.6 + Math.sin(this.#lastTime / 150) * 0.4})`;
-        this.#ctx.lineWidth = 3;
+        // ⛰️ TERRENO
+        this.#ctx.fillStyle = '#1c130d'; 
+        this.#ctx.fillRect(0, 500, 800, 100);
         this.#ctx.beginPath();
-        this.#ctx.arc(this.#state.targetPos.x, this.#state.targetPos.y, 40, 0, Math.PI * 2);
-        this.#ctx.stroke();
-        this.#ctx.shadowBlur = 0; // Limpiar pipeline
+        this.#ctx.moveTo(500, 500);
+        this.#ctx.lineTo(600, 350);
+        this.#ctx.lineTo(800, 350);
+        this.#ctx.lineTo(800, 500);
+        this.#ctx.fill();
+
+        // 🛡️ ESTANDARTE SPQR
+        this.#ctx.fillStyle = '#9e1b1b'; 
+        this.#ctx.fillRect(30, 380, 40, 120);
+        this.#ctx.fillStyle = '#ffcc00';
+        this.#ctx.font = 'bold 12px serif';
+        this.#ctx.fillText('S P Q R', 32, 400);
+
+        // 🪵 ONAGRO ROMANO (Catapulta)
+        this.#ctx.fillStyle = '#4a2b15'; 
+        this.#ctx.fillRect(this.#state.origin.x - 30, this.#state.origin.y - 10, 60, 30); 
+        this.#ctx.beginPath();
+        this.#ctx.arc(this.#state.origin.x - 15, this.#state.origin.y + 20, 15, 0, Math.PI*2); 
+        this.#ctx.arc(this.#state.origin.x + 15, this.#state.origin.y + 20, 15, 0, Math.PI*2);
+        this.#ctx.fillStyle = '#221105';
+        this.#ctx.fill();
+        
+        // Brazo dinámico
+        const aimAngle = Math.atan2(this.#state.mousePos.y - this.#state.origin.y, this.#state.mousePos.x - this.#state.origin.x);
+        this.#ctx.save();
+        this.#ctx.translate(this.#state.origin.x, this.#state.origin.y);
+        this.#ctx.rotate(aimAngle);
+        this.#ctx.fillStyle = '#6b3e1f';
+        this.#ctx.fillRect(0, -5, 50, 10); 
+        this.#ctx.restore();
+
+        // 🏰 FORTALEZA BÁRBARA
+        const t = this.#state.target;
+        this.#ctx.fillStyle = '#5a5a5a'; 
+        this.#ctx.fillRect(t.x, t.y, t.w, t.h);
+        
+        // Grietas por daño
+        if (this.#state.score > 0) {
+            this.#ctx.strokeStyle = '#222';
+            this.#ctx.lineWidth = 3;
+            this.#ctx.beginPath();
+            this.#ctx.moveTo(t.x + 10, t.y + 20);
+            this.#ctx.lineTo(t.x + 40, t.y + 80);
+            this.#ctx.lineTo(t.x + 70, t.y + 140);
+            this.#ctx.stroke();
+            this.#spawnFireParticles(t.x + 40, t.y + 100, 1); // El muro arde
+        }
     }
 
     #drawProjectiles() {
-        for (const arrow of this.#memory.entities) {
-            // Estela Cinética
-            this.#ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            this.#ctx.lineWidth = 1;
+        for (const rock of this.#memory.entities) {
+            // Estela de humo gris
+            this.#ctx.strokeStyle = 'rgba(100, 100, 100, 0.4)';
+            this.#ctx.lineWidth = 6;
+            this.#ctx.lineCap = 'round';
             this.#ctx.beginPath();
-            for (let i = 0; i < arrow.trail.length; i++) {
-                if (i === 0) this.#ctx.moveTo(arrow.trail[i].x, arrow.trail[i].y);
-                else this.#ctx.lineTo(arrow.trail[i].x, arrow.trail[i].y);
+            for (let i = 0; i < rock.trail.length; i++) {
+                if (i === 0) this.#ctx.moveTo(rock.trail[i].x, rock.trail[i].y);
+                else this.#ctx.lineTo(rock.trail[i].x, rock.trail[i].y);
             }
             this.#ctx.stroke();
 
-            // Cuerpo del Proyectil orientado por su vector de velocidad
-            this.#ctx.save();
-            this.#ctx.translate(arrow.pos.x, arrow.pos.y);
-            this.#ctx.rotate(Math.atan2(arrow.vel.y, arrow.vel.x));
-            this.#ctx.fillStyle = '#ffffff';
-            this.#ctx.fillRect(-12, -1.5, 24, 3);
-            this.#ctx.restore();
+            // La Roca
+            this.#ctx.fillStyle = '#ff6600'; 
+            this.#ctx.beginPath();
+            this.#ctx.arc(rock.pos.x, rock.pos.y, 14, 0, Math.PI * 2);
+            this.#ctx.fill();
+            this.#ctx.fillStyle = '#fff'; 
+            this.#ctx.beginPath();
+            this.#ctx.arc(rock.pos.x, rock.pos.y, 7, 0, Math.PI * 2);
+            this.#ctx.fill();
+        }
+    }
+
+    #spawnFireParticles(px, py, amount) {
+        const pBuf = this.#memory.particleBuffer;
+        let spawned = 0;
+        for (let i = 0; i < pBuf.length; i += 5) {
+            if (pBuf[i + 4] <= 0) { 
+                pBuf[i] = px + (Math.random() * 20 - 10);     
+                pBuf[i + 1] = py + (Math.random() * 20 - 10); 
+                pBuf[i + 2] = (Math.random() - 0.5) * 100; 
+                pBuf[i + 3] = (Math.random() - 1.0) * 150; 
+                pBuf[i + 4] = 0.5 + Math.random() * 0.8;   
+                if (++spawned >= amount) break; 
+            }
         }
     }
 
     #drawParticles() {
         const pBuf = this.#memory.particleBuffer;
-        // Leemos la memoria binaria directamente. Rendimiento brutal.
         for (let i = 0; i < pBuf.length; i += 5) {
             const life = pBuf[i + 4];
             if (life > 0) {
-                // Interpolar de blanco (caliente) a dorado oscuro (frío)
-                this.#ctx.fillStyle = `rgba(255, ${Math.floor(life * 200)}, 50, ${life})`;
-                this.#ctx.fillRect(pBuf[i], pBuf[i + 1], 4, 4);
+                // Color procedural: Amarillo -> Fuego -> Humo gris oscuro
+                let color = `rgba(255, 200, 0, ${life})`; 
+                if (life < 0.6) color = `rgba(255, 50, 0, ${life})`; 
+                if (life < 0.3) color = `rgba(80, 80, 80, ${life})`; 
+
+                this.#ctx.fillStyle = color;
+                this.#ctx.beginPath();
+                this.#ctx.arc(pBuf[i], pBuf[i + 1], 12 * life, 0, Math.PI * 2);
+                this.#ctx.fill();
             }
         }
     }
 
     #drawUI() {
-        this.#ctx.fillStyle = '#b89b5e';
-        this.#ctx.font = 'bold 16px "Share Tech Mono", Courier';
-        this.#ctx.fillText(`GATE INTEGRITY: ${this.#state.score} / ${this.#state.requiredHits}`, 20, 30);
+        this.#ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        this.#ctx.fillRect(0, 0, 800, 60);
         
-        // Alerta de proyectiles bajos
-        this.#ctx.fillStyle = this.#state.arrowsLeft <= 3 ? '#ff3366' : '#b89b5e';
-        this.#ctx.fillText(`PROJECTILES: ${this.#state.arrowsLeft}`, 20, 55);
+        this.#ctx.fillStyle = '#ffcc00'; // Oro Romano
+        this.#ctx.font = 'bold 22px "Cinzel", serif, Arial';
+        this.#ctx.fillText('⚔️ ASEDIO ROMANO', 20, 30);
+        
+        this.#ctx.fillStyle = '#ffffff';
+        this.#ctx.font = '16px Arial';
+        this.#ctx.fillText(`Misión: Destruye el muro. Impactos: ${this.#state.score} / ${this.#state.requiredHits}`, 20, 50);
+        
+        this.#ctx.fillStyle = this.#state.arrowsLeft <= 2 ? '#ff3333' : '#00ffcc';
+        this.#ctx.font = 'bold 20px Arial';
+        this.#ctx.fillText(`ROCAS INCENDIARIAS: ${this.#state.arrowsLeft}`, 530, 35);
+
+        if (this.#memory.entities.length === 0 && this.#state.score === 0 && this.#state.arrowsLeft === 6) {
+            this.#ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            this.#ctx.font = 'bold 24px Arial';
+            this.#ctx.textAlign = 'center';
+            this.#ctx.fillText('¡MUEVE EL RATÓN PARA APUNTAR Y HAZ CLICK PARA DISPARAR!', 400, 200);
+            this.#ctx.textAlign = 'left';
+        }
     }
 
-    // ==========================================
-    // SISTEMA DE IMPACTO Y EVENTOS
-    // ==========================================
-
     #processImpact(entityIndex) {
+        const rock = this.#memory.entities[entityIndex];
         this.#memory.entities.splice(entityIndex, 1);
         this.#state.score++;
-        this.#triggerScreenShake(15); // Impacto crítico
-        
-        if (window.AudioSystem) window.AudioSystem.playSuccess();
+        this.#triggerScreenShake(30); 
+        this.#playStoneImpact();
 
-        // Inyección binaria de partículas (Cero instanciación de objetos)
+        // Explosión masiva de la pared
         const pBuf = this.#memory.particleBuffer;
         let spawned = 0;
         for (let i = 0; i < pBuf.length; i += 5) {
-            if (pBuf[i + 4] <= 0) { // Encontrar bloque de memoria libre
-                pBuf[i] = this.#state.targetPos.x;     
-                pBuf[i + 1] = this.#state.targetPos.y; 
-                pBuf[i + 2] = (Math.random() - 0.5) * 800; // Explosión cinética
-                pBuf[i + 3] = (Math.random() - 0.5) * 800; 
-                pBuf[i + 4] = 1.0 + Math.random() * 0.5;   
-                if (++spawned >= 25) break; 
+            if (pBuf[i + 4] <= 0) { 
+                pBuf[i] = rock.pos.x;     
+                pBuf[i + 1] = rock.pos.y; 
+                pBuf[i + 2] = (Math.random() - 0.8) * 800; // Caen hacia ti
+                pBuf[i + 3] = (Math.random() - 1.0) * 800; 
+                pBuf[i + 4] = 1.0 + Math.random() * 1.0;   
+                if (++spawned >= 150) break; 
             }
         }
     }
@@ -370,7 +460,6 @@ export class RomanDefense {
 
     #endPhase(success) {
         this.destroy(); 
-        // Pausa dramática para que el jugador vea caer las últimas chispas
-        setTimeout(() => this.#onComplete(success), 1200); 
+        setTimeout(() => this.#onComplete(success), 1500); 
     }
 }
