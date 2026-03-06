@@ -1,0 +1,371 @@
+/* =========================================
+   AETHER-ROME: MASTER STYLESHEET (v4.0 - GOD TIER)
+   Aesthetic: Aether-Academia, Parchment, Sepia & Gold
+   Architecture: GPU-Accelerated, Fluid Responsive, BEM-ish
+   ========================================= */
+
+/* --- 1. CORE TOKENS (Design System) --- */
+:root {
+    /* Color Palette */
+    --bg-parchment: #f4ebd8;    
+    --ink-sepia: #4a3b32;       
+    --wood-pastel: #d5c4b3;     
+    --border-soft: #bda892;     
+    --accent-gold: #b89b5e;     
+    --alert-rose: #c96f6f;      
+    --success-sage: #8da37b;
+    --aether-glow: rgba(184, 155, 94, 0.4);
+
+    /* Typography */
+    --roman-font: 'Cinzel', serif;
+    --text-font: 'Share Tech Mono', 'Courier New', monospace;
+
+    /* Metrics */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- 2. GLOBAL RESET & TEXTURE --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #e8dbcc;
+    /* Patrón de textura de papel antiguo generado matemáticamente */
+    background-image: radial-gradient(var(--border-soft) 1px, transparent 1px);
+    background-size: 20px 20px;
+    color: var(--ink-sepia);
+    font-family: var(--text-font);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden; /* Previene scroll en juegos Canvas */
+}
+
+/* Lente Mágico / CRT Vintage */
+.crt-scanlines {
+    position: fixed;
+    inset: 0;
+    /* Tono cálido sepia en lugar de RGB frío */
+    background: linear-gradient(rgba(184, 155, 94, 0.03) 50%, rgba(74, 59, 50, 0.05) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 10000;
+}
+
+/* --- 3. PANTALLA DE ARRANQUE (Start Screen) --- */
+#start-screen {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, var(--wood-pastel) 0%, #a3917e 100%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity var(--transition-smooth);
+}
+
+.start-box {
+    text-align: center;
+    background: var(--bg-parchment);
+    padding: 40px;
+    border: 4px solid var(--accent-gold);
+    border-radius: var(--radius-md);
+    box-shadow: 0 20px 50px rgba(74, 59, 50, 0.5);
+}
+
+.roman-title {
+    font-family: var(--roman-font);
+    color: var(--accent-gold);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    text-shadow: 2px 2px 0px var(--ink-sepia);
+    margin-bottom: 10px;
+}
+
+/* --- 4. ENGINE CONTAINER (Main Frame) --- */
+#app-container {
+    width: 95vw;
+    max-width: 1000px;
+    height: 90vh;
+    max-height: 700px;
+    background-color: var(--bg-parchment);
+    border: 4px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    box-shadow: 0 25px 50px rgba(74, 59, 50, 0.3), inset 0 0 60px rgba(213, 196, 179, 0.5);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+/* --- 5. HUD (Heads Up Display) --- */
+#hud-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    border-bottom: 3px solid var(--border-soft);
+    background-color: var(--wood-pastel);
+    font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    font-weight: bold;
+    flex-wrap: wrap;
+    gap: 15px;
+    z-index: 100;
+}
+
+.imperial-input, select {
+    background: var(--bg-parchment);
+    color: var(--ink-sepia);
+    border: 2px solid var(--border-soft);
+    padding: 8px 12px;
+    font-family: var(--text-font);
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
+}
+
+.imperial-input:hover, select:hover { border-color: var(--accent-gold); }
+.imperial-input:focus-visible, select:focus-visible { outline: 2px solid var(--accent-gold); }
+
+.neon-text { color: var(--accent-gold); }
+.text-red { color: var(--alert-rose); }
+.text-gold { color: var(--accent-gold); }
+
+.blinking-dot {
+    display: inline-block;
+    width: 12px; height: 12px;
+    background-color: var(--success-sage);
+    border-radius: 50%;
+    margin-right: 8px;
+    box-shadow: 0 0 10px var(--success-sage);
+    animation: blink 2s infinite;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* --- 6. STATE MACHINE LAYERS (View Management) --- */
+#display-matrix {
+    flex-grow: 1;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at center, var(--bg-parchment) 0%, var(--wood-pastel) 100%);
+}
+
+.view-layer {
+    width: 100%; 
+    height: 100%;
+    position: absolute;
+    inset: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: opacity var(--transition-smooth), transform var(--transition-smooth);
+    will-change: opacity, transform; /* GPU Acceleration */
+}
+
+.hidden { 
+    opacity: 0; 
+    visibility: hidden; 
+    pointer-events: none; 
+    transform: scale(0.98); 
+    z-index: 0;
+}
+
+.active-layer { 
+    opacity: 1; 
+    visibility: visible; 
+    pointer-events: auto; 
+    transform: scale(1);
+    z-index: 10; 
+}
+
+/* --- 7. THE CLASSROOM (Professor & Chalkboard) --- */
+.professor-avatar { 
+    width: 160px; height: 160px; 
+    border-radius: 50%; 
+    border: 4px solid var(--accent-gold); 
+    margin-bottom: 25px; 
+    position: relative; 
+    background-image: url('https://res.cloudinary.com/dr1ceh87v/image/upload/v1772725961/1000_F_999816347_D2Ho0g6tpCKlJf5ytn67iZ9BynePJm87_rzhcfm.jpg');
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 15px 35px rgba(74, 59, 50, 0.4);
+    transform: translateZ(0); /* Force GPU Render */
+}
+
+.hologram-glow { 
+    position: absolute; inset: -15px; 
+    border-radius: 50%; 
+    background: radial-gradient(circle, var(--aether-glow) 0%, transparent 70%); 
+    z-index: -1; 
+    animation: pulse 3s infinite alternate ease-in-out; 
+}
+
+@keyframes pulse { 
+    0% { transform: scale(0.9); opacity: 0.5; } 
+    100% { transform: scale(1.1); opacity: 1; } 
+}
+
+#smart-chalkboard, #trivia-container {
+    background-color: #fcf9f2; 
+    border: 3px solid var(--wood-pastel);
+    width: 90%;
+    max-width: 800px;
+    padding: clamp(20px, 4vw, 40px);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 2px 15px rgba(74, 59, 50, 0.08), 0 10px 25px rgba(74, 59, 50, 0.1);
+    text-align: center;
+}
+
+/* Conecta con el tag <h2> dinámico del engine */
+#classroom-layer h2, .sci-fi-text {
+    font-family: var(--roman-font);
+    color: var(--ink-sepia);
+    font-size: clamp(1.6rem, 3.5vw, 2.2rem); 
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--border-soft);
+    padding-bottom: 15px;
+}
+
+.lesson-content {
+    font-size: clamp(1.1rem, 2vw, 1.3rem);
+    line-height: 1.8;
+    color: var(--ink-sepia);
+    font-weight: 500;
+}
+
+/* --- 8. TRIVIA GRID (Engine Injected) --- */
+.options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+    gap: 15px;
+    margin-top: 25px;
+}
+
+/* --- 9. BUTTONS (The Imperial Standard) --- */
+.btn-option, .sci-fi-btn {
+    background-color: var(--bg-parchment);
+    border: 2px solid var(--border-soft);
+    color: var(--ink-sepia);
+    padding: 15px 25px;
+    font-family: var(--text-font);
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    transition: transform 0.1s, background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: 0 4px 6px rgba(74, 59, 50, 0.05); 
+}
+
+.btn-option:hover, .sci-fi-btn:hover {
+    background-color: var(--wood-pastel);
+    border-color: var(--accent-gold);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(184, 155, 94, 0.2);
+}
+
+.btn-option:active, .sci-fi-btn:active {
+    transform: translateY(1px);
+}
+
+.action-btn { 
+    background-color: var(--ink-sepia);
+    color: var(--bg-parchment);
+    border-color: var(--ink-sepia);
+}
+
+.action-btn:hover { 
+    background-color: var(--accent-gold); 
+    border-color: var(--accent-gold);
+    color: var(--ink-sepia);
+}
+
+.btn-danger {
+    border-color: var(--alert-rose);
+    color: var(--alert-rose);
+}
+
+.btn-danger:hover {
+    background-color: var(--alert-rose);
+    color: var(--bg-parchment);
+}
+
+/* --- 10. DEFENSE CANVAS --- */
+#defense-grid {
+    border: 4px solid var(--border-soft);
+    background-color: #1a1714; /* Oscuro para contraste de los vectores */
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 30px rgba(74, 59, 50, 0.3);
+    max-width: 100%; 
+    object-fit: contain;
+    cursor: crosshair;
+}
+
+/* --- 11. CONTROLS FOOTER --- */
+#action-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    padding: 20px;
+    border-top: 3px solid var(--border-soft);
+    background-color: var(--wood-pastel);
+    z-index: 100;
+}
+
+/* --- 12. AI MODAL (DeepSeek Hologram) --- */
+.modal-layer {
+    position: fixed;
+    inset: 0;
+    background: rgba(74, 59, 50, 0.85);
+    backdrop-filter: blur(5px); /* Efecto cristalino vintage */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5000;
+    transition: opacity var(--transition-smooth);
+}
+
+.modal-content {
+    background: var(--bg-parchment);
+    border: 4px solid var(--accent-gold);
+    border-radius: var(--radius-md);
+    padding: 40px;
+    width: 90%;
+    max-width: 650px; 
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    transform: translateY(0);
+    animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-content h3 {
+    font-family: var(--roman-font);
+    color: var(--accent-gold);
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+}
+
+#ai-response-text {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    margin: 20px 0 30px 0;
+    color: var(--ink-sepia);
+    font-weight: bold;
+}
+
+@keyframes modalSlideIn {
+    from { transform: translateY(30px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
